@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Astro Target Planner</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 16px 20px; background: #0b0f1a; color: #dbe4ff; max-width: 1400px; }
+  h1 { margin: 0 0 4px; font-size: 20px; }
+  .sub { color: #8aa0d0; font-size: 12px; margin-bottom: 16px; }
+  section { background: #141a2c; border: 1px solid #24304b; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; }
+  h2 { margin: 0 0 8px; font-size: 14px; color: #9bb4ea; text-transform: uppercase; letter-spacing: 0.05em; }
+  label { display: inline-flex; align-items: center; gap: 6px; margin-right: 14px; font-size: 13px; }
+  input, select, button { box-sizing: border-box; }
+  input[type=text], input[type=datetime-local], select { background: #0b1224; color: #dbe4ff; border: 1px solid #2c3a5b; border-radius: 4px; padding: 4px 8px; font-size: 13px; font-family: inherit; }
+  input[type=text] { width: 90px; }
+  button { background: #2a4178; color: #fff; border: 0; border-radius: 4px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+  button:hover { background: #365497; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { padding: 5px 8px; border-bottom: 1px solid #24304b; text-align: right; white-space: nowrap; }
+  th { color: #9bb4ea; background: #0f1527; font-weight: 600; text-align: right; cursor: pointer; user-select: none; position: sticky; top: 0; }
+  th:first-child, td:first-child { text-align: left; }
+  th:nth-child(2), td:nth-child(2),
+  th:nth-child(3), td:nth-child(3) { text-align: left; }
+  tr.observable { background: rgba(48, 140, 80, 0.15); }
+  tr.up-now { background: rgba(40, 180, 100, 0.22); }
+  tr.below { color: #6a7a9a; }
+  tr.spec td:first-child { border-left: 3px solid #ffd166; padding-left: 6px; }
+  tr.spec td:first-child::before { content: '★ '; color: #ffd166; font-weight: bold; }
+  .tier1 { color: #ffd166; }
+  .tier2 { color: #9be0ff; }
+  .tier3 { color: #b0a0ff; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  .stat { font-size: 13px; line-height: 1.5; }
+  .stat b { color: #fff; }
+  .muted { color: #8aa0d0; }
+  .warn { color: #ffb347; }
+  .good { color: #7ee6a3; }
+  .bad  { color: #ff8080; }
+  td.hi-alt, td.good-mag { color: #ff5e5e; font-weight: 600; }
+  .vis-strip { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
+  .vis-cell { display: flex; flex-direction: column; align-items: center; min-width: 52px; cursor: pointer; padding: 4px 2px; border-radius: 6px; transition: background 0.12s; }
+  .vis-cell:hover { background: rgba(155, 180, 234, 0.12); }
+  .vis-cell.selected { background: rgba(155, 180, 234, 0.22); }
+  .vis-cell .hour { font-size: 11px; color: #8aa0d0; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .vis-cell.selected .hour { color: #dbe4ff; }
+  .vis-cell .circle { width: 34px; height: 34px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
+  .vis-cell.selected .circle { box-shadow: 0 0 0 2px #dbe4ff; }
+  .vis-cell .pct { font-size: 12px; margin-top: 4px; color: #dbe4ff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vis-loading { color: #8aa0d0; font-size: 12px; }
+  .day-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .day-chip { display: flex; flex-direction: column; align-items: center; min-width: 52px; padding: 5px 8px; border: 1px solid #2c3a5b; border-radius: 6px; cursor: pointer; background: #0b1224; transition: background 0.12s; }
+  .day-chip:hover { background: rgba(155, 180, 234, 0.12); }
+  .day-chip.selected { background: #2a4178; border-color: #4a6db8; }
+  .day-chip .dow { font-size: 11px; color: #8aa0d0; }
+  .day-chip.selected .dow { color: #dbe4ff; }
+  .day-chip .dom { font-size: 12px; font-weight: 600; }
+  .table-wrap { max-height: 65vh; overflow: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Mobile */
+  @media (max-width: 700px) {
+    body { padding: 12px; }
+    .grid3 { grid-template-columns: 1fr; }
+    label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 8px; margin: 0 0 8px; }
+    label:has(input[type=checkbox]) { justify-content: flex-start; }
+    select { flex: 1; min-width: 0; }
+    /* 16px stops iOS zooming the page when an input is focused */
+    input[type=text], input[type=datetime-local], select { font-size: 16px; padding: 6px 8px; min-width: 0; max-width: 100%; }
+    input[type=text] { width: 110px; }
+    input[type=datetime-local] { width: 100%; }
+    button { padding: 10px 18px; font-size: 15px; margin: 4px 8px 0 0; }
+    .table-wrap { max-height: none; }
+    table { font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Astro Target Planner</h1>
+<div class="sub" id="subtitle"></div>
+
+<section>
+  <h2>Location &amp; time</h2>
+  <label>Lat (°): <input type="text" id="lat" value=""></label>
+  <label>Lon (°): <input type="text" id="lon" value=""></label>
+  <label>UTC offset (h): <input type="text" id="tz" value=""></label>
+  <label>Date/time (local): <input type="datetime-local" id="when"></label>
+  <label>Min alt (°): <input type="text" id="minAlt" value="30"></label>
+  <label>Setup:
+    <select id="setup"></select>
+  </label>
+  <label><input type="checkbox" id="specOnly"> SA100 targets only</label>
+  <button onclick="refresh(true)">Refresh</button>
+  <button onclick="setNow()">Now</button>
+  <button onclick="useMyLocation()">Use my location</button>
+  <div class="sub" style="margin-top:8px">Decimal separators: both <code>.</code> and <code>,</code> are accepted. UTC offset auto-fills from this device's clock — adjust it when planning for another time zone or across a DST change. Location and settings are remembered on this device only.</div>
+  <div id="dayPanel" class="day-strip"></div>
+</section>
+
+<section>
+  <h2>Selected setup</h2>
+  <div id="fovInfo" class="stat"></div>
+</section>
+
+<section>
+  <h2>Sun, Moon &amp; twilight</h2>
+  <div class="grid3">
+    <div class="stat" id="sunInfo"></div>
+    <div class="stat" id="moonInfo"></div>
+    <div class="stat" id="twiInfo"></div>
+  </div>
+</section>
+
+<section>
+  <h2>Tonight's visibility (sunset → sunrise)</h2>
+  <div id="visStrip" class="vis-strip vis-loading">Loading…</div>
+  <div class="sub" id="visMeta" style="margin-top:8px"></div>
+</section>
+
+<section>
+  <h2>Targets <span class="muted" id="targetCount"></span></h2>
+  <div class="table-wrap">
+    <table id="targetTable">
+      <thead><tr>
+        <th data-sort="name">Target</th>
+        <th data-sort="type">Type</th>
+        <th data-sort="constellation">Constellation</th>
+        <th data-sort="mag">Mag</th>
+        <th data-sort="alt">Alt (°)</th>
+        <th data-sort="az">Az (°)</th>
+        <th data-sort="maxAlt">Max alt tonight (°)</th>
+        <th data-sort="transit">Transit (local)</th>
+        <th data-sort="rise">Rise</th>
+        <th data-sort="set">Set</th>
+        <th data-sort="score">Status</th>
+        <th>SA100/Other notes</th>
+      </tr></thead>
+      <tbody id="targetBody"></tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+/* =========================================================
+ *  CONFIG — your gear
+ * ========================================================= */
+const SETUPS = [
+  { name: 'AD8 + ASI 174 MM (mono)',
+    aperture: 203, focalLength: 1200,
+    sensorW: 11.3, sensorH: 7.1,
+    pxW: 1936, pxH: 1216, pixelSize: 5.86,
+    camera: 'ZWO ASI 174 MM' },
+  { name: 'AD8 + ASI 678 MC (color)',
+    aperture: 203, focalLength: 1200,
+    sensorW: 7.7, sensorH: 4.3,
+    pxW: 3856, pxH: 2180, pixelSize: 2.0,
+    camera: 'ZWO ASI 678 MC' },
+];
+
+/* =========================================================
+ *  TARGET CATALOG  (RA hours, Dec degrees, J2000)
+ *  Add more freely — just append to the array.
+ * ========================================================= */
+const DSO = [
+  // Messier
+  { name:'M1 Crab Nebula',       type:'SNR',         constellation:'Taurus',          ra: 5.5755, dec: 22.01,  mag: 8.4 },
+  { name:'M3',                   type:'Globular',    constellation:'Canes Venatici',  ra:13.7031, dec: 28.38,  mag: 6.2 },
+  { name:'M8 Lagoon',            type:'Nebula',      constellation:'Sagittarius',     ra:18.0606, dec:-24.38,  mag: 6.0 },
+  { name:'M13 Great Hercules',   type:'Globular',    constellation:'Hercules',        ra:16.6949, dec: 36.46,  mag: 5.8 },
+  { name:'M15',                  type:'Globular',    constellation:'Pegasus',         ra:21.4994, dec: 12.17,  mag: 6.2 },
+  { name:'M16 Eagle',            type:'Nebula',      constellation:'Serpens',         ra:18.3133, dec:-13.78,  mag: 6.0 },
+  { name:'M17 Omega',            type:'Nebula',      constellation:'Sagittarius',     ra:18.3464, dec:-16.17,  mag: 6.0 },
+  { name:'M20 Trifid',           type:'Nebula',      constellation:'Sagittarius',     ra:18.0397, dec:-23.03,  mag: 6.3 },
+  { name:'M27 Dumbbell',         type:'Planetary',   constellation:'Vulpecula',       ra:19.9934, dec: 22.72,  mag: 7.5 },
+  { name:'M31 Andromeda',        type:'Galaxy',      constellation:'Andromeda',       ra: 0.7123, dec: 41.27,  mag: 3.4 },
+  { name:'M33 Triangulum',       type:'Galaxy',      constellation:'Triangulum',      ra: 1.5648, dec: 30.66,  mag: 5.7 },
+  { name:'M35',                  type:'Cluster',     constellation:'Gemini',          ra: 6.1500, dec: 24.35,  mag: 5.1 },
+  { name:'M36',                  type:'Cluster',     constellation:'Auriga',          ra: 5.6033, dec: 34.13,  mag: 6.0 },
+  { name:'M37',                  type:'Cluster',     constellation:'Auriga',          ra: 5.8717, dec: 32.55,  mag: 5.6 },
+  { name:'M38',                  type:'Cluster',     constellation:'Auriga',          ra: 5.4783, dec: 35.85,  mag: 6.4 },
+  { name:'M42 Orion Nebula',     type:'Nebula',      constellation:'Orion',           ra: 5.5881, dec: -5.39,  mag: 4.0 },
+  { name:'M44 Beehive',          type:'Cluster',     constellation:'Cancer',          ra: 8.6700, dec: 19.68,  mag: 3.7 },
+  { name:'M45 Pleiades',         type:'Cluster',     constellation:'Taurus',          ra: 3.7910, dec: 24.12,  mag: 1.6 },
+  { name:'M51 Whirlpool',        type:'Galaxy',      constellation:'Canes Venatici',  ra:13.4980, dec: 47.20,  mag: 8.4 },
+  { name:'M52',                  type:'Cluster',     constellation:'Cassiopeia',      ra:23.4139, dec: 61.58,  mag: 5.0 },
+  { name:'M57 Ring Nebula',      type:'Planetary',   constellation:'Lyra',            ra:18.8936, dec: 33.03,  mag: 8.8 },
+  { name:'M63 Sunflower',        type:'Galaxy',      constellation:'Canes Venatici',  ra:13.2635, dec: 42.03,  mag: 8.6 },
+  { name:'M65',                  type:'Galaxy',      constellation:'Leo',             ra:11.3156, dec: 13.09,  mag: 9.3 },
+  { name:'M66',                  type:'Galaxy',      constellation:'Leo',             ra:11.3375, dec: 12.99,  mag: 8.9 },
+  { name:'M78',                  type:'Nebula',      constellation:'Orion',           ra: 5.7797, dec:  0.05,  mag: 8.3 },
+  { name:'M81 Bode',             type:'Galaxy',      constellation:'Ursa Major',      ra: 9.9258, dec: 69.07,  mag: 6.9 },
+  { name:'M82 Cigar',            type:'Galaxy',      constellation:'Ursa Major',      ra: 9.9314, dec: 69.68,  mag: 8.4 },
+  { name:'M92 Globular',         type:'Globular',    constellation:'Hercules',        ra:17.2852, dec: 43.14,  mag: 6.3 },
+  { name:'M97 Owl',              type:'Planetary',   constellation:'Ursa Major',      ra:11.2467, dec: 55.02,  mag: 9.9 },
+  { name:'M101 Pinwheel',        type:'Galaxy',      constellation:'Ursa Major',      ra:14.0534, dec: 54.35,  mag: 7.9 },
+  { name:'M104 Sombrero',        type:'Galaxy',      constellation:'Virgo',           ra:12.6664, dec:-11.62,  mag: 8.0 },
+  { name:'M106 Galaxy',          type:'Galaxy',      constellation:'Canes Venatici',  ra:12.3167, dec: 47.30,  mag: 8.4 },
+  // NGC / IC
+  { name:'NGC 253 Sculptor',     type:'Galaxy',      constellation:'Sculptor',        ra: 0.7925, dec:-25.29,  mag: 7.2 },
+  { name:'NGC 869 Double Cluster',type:'Cluster',    constellation:'Perseus',         ra: 2.3167, dec: 57.14,  mag: 4.3 },
+  { name:'NGC 2264 Cone',        type:'Nebula',      constellation:'Monoceros',       ra: 6.6833, dec:  9.88,  mag: 3.9 },
+  { name:'NGC 2392 Eskimo',      type:'Planetary',   constellation:'Gemini',          ra: 7.4873, dec: 20.91,  mag: 9.1 },
+  { name:'NGC 6543 Cat’s Eye',  type:'Planetary', constellation:'Draco',         ra:17.9761, dec: 66.63,  mag: 8.1 },
+  { name:'NGC 6888 Crescent',    type:'Nebula',      constellation:'Cygnus',          ra:20.2042, dec: 38.36,  mag: 7.4 },
+  { name:'NGC 6946 Fireworks',   type:'Galaxy',      constellation:'Cepheus',         ra:20.5817, dec: 60.15,  mag: 8.8 },
+  { name:'NGC 6960 Veil (W)',    type:'SNR',         constellation:'Cygnus',          ra:20.7617, dec: 30.72,  mag: 7.0 },
+  { name:'NGC 6992 Veil (E)',    type:'SNR',         constellation:'Cygnus',          ra:20.9400, dec: 31.72,  mag: 7.0 },
+  { name:'NGC 7000 N. America',  type:'Nebula',      constellation:'Cygnus',          ra:20.9800, dec: 44.33,  mag: 4.0 },
+  { name:'NGC 7293 Helix',       type:'Planetary',   constellation:'Aquarius',        ra:22.4933, dec:-20.83,  mag: 7.3 },
+  { name:'IC 434 Horsehead',     type:'Nebula',      constellation:'Orion',           ra: 5.6817, dec: -2.45,  mag: 6.8 },
+  { name:'IC 1805 Heart',        type:'Nebula',      constellation:'Cassiopeia',      ra: 2.5567, dec: 61.45,  mag: 6.5 },
+  { name:'IC 1848 Soul',         type:'Nebula',      constellation:'Cassiopeia',      ra: 2.8667, dec: 60.42,  mag: 6.5 },
+  // Popular nebulae (northern hemisphere, reachable from ~49°N)
+  { name:'M76 Little Dumbbell',  type:'Planetary',   constellation:'Perseus',         ra: 1.7067, dec: 51.57,  mag:10.1 },
+  { name:'NGC 281 Pacman',       type:'Nebula',      constellation:'Cassiopeia',      ra: 0.8830, dec: 56.62,  mag: 7.4 },
+  { name:'NGC 1499 California',  type:'Nebula',      constellation:'Perseus',         ra: 4.0550, dec: 36.42,  mag: 5.0 },
+  { name:'NGC 1977 Running Man', type:'Nebula',      constellation:'Orion',           ra: 5.5878, dec: -4.82,  mag: 7.0 },
+  { name:'NGC 2024 Flame',       type:'Nebula',      constellation:'Orion',           ra: 5.6983, dec: -1.85,  mag:10.0 },
+  { name:'NGC 2174 Monkey Head', type:'Nebula',      constellation:'Orion',           ra: 6.1567, dec: 20.50,  mag: 6.8 },
+  { name:'NGC 2237 Rosette',     type:'Nebula',      constellation:'Monoceros',       ra: 6.5150, dec:  5.05,  mag: 9.0 },
+  { name:'NGC 6826 Blinking',    type:'Planetary',   constellation:'Cygnus',          ra:19.7467, dec: 50.53,  mag: 8.8 },
+  { name:'NGC 7023 Iris',        type:'Nebula',      constellation:'Cepheus',         ra:21.0267, dec: 68.17,  mag: 6.8 },
+  { name:'NGC 7380 Wizard',      type:'Nebula',      constellation:'Cepheus',         ra:22.7833, dec: 58.10,  mag: 7.2 },
+  { name:'NGC 7635 Bubble',      type:'Nebula',      constellation:'Cassiopeia',      ra:23.3467, dec: 61.20,  mag:10.0 },
+  { name:'NGC 7822',             type:'Nebula',      constellation:'Cepheus',         ra: 0.0600, dec: 68.62,  mag: 9.0 },
+  { name:'IC 405 Flaming Star',  type:'Nebula',      constellation:'Auriga',          ra: 5.2700, dec: 34.27,  mag: 6.0 },
+  { name:'IC 410 Tadpoles',      type:'Nebula',      constellation:'Auriga',          ra: 5.3767, dec: 33.52,  mag: 7.5 },
+  { name:'IC 443 Jellyfish',     type:'SNR',         constellation:'Gemini',          ra: 6.2869, dec: 22.52,  mag:12.0 },
+  { name:'IC 1396 Elephant Trunk',type:'Nebula',     constellation:'Cepheus',         ra:21.6517, dec: 57.50,  mag: 3.5 },
+  { name:'IC 5070 Pelican',      type:'Nebula',      constellation:'Cygnus',          ra:20.8467, dec: 44.35,  mag: 8.0 },
+  { name:'IC 5146 Cocoon',       type:'Nebula',      constellation:'Cygnus',          ra:21.8900, dec: 47.27,  mag: 7.2 },
+  { name:'Sh2-101 Tulip',        type:'Nebula',      constellation:'Cygnus',          ra:20.0086, dec: 35.27,  mag: 9.0 },
+  // Bright stars
+  { name:'Polaris',              type:'Star', constellation:'Ursa Minor', sptype:'F7Ib',         ra: 2.5303, dec: 89.26,  mag: 2.0 },
+  { name:'Vega',                 type:'Star', constellation:'Lyra',       sptype:'A0V',          ra:18.6157, dec: 38.78,  mag: 0.0 },
+  { name:'Deneb',                type:'Star', constellation:'Cygnus',     sptype:'A2Ia',         ra:20.6905, dec: 45.28,  mag: 1.3 },
+  { name:'Altair',               type:'Star', constellation:'Aquila',     sptype:'A7V',          ra:19.8464, dec:  8.87,  mag: 0.8 },
+  { name:'Capella',              type:'Star', constellation:'Auriga',     sptype:'G8III + G0III',ra: 5.2782, dec: 45.99,  mag: 0.1 },
+
+  // ==== Star Analyser 100 spectroscopy targets ====
+  // Tier 1: high-RV bright stars (direction checks, single-line)
+  { name:'Aldebaran (α Tau)',    type:'Star', constellation:'Taurus',     sptype:'K5III',       ra: 4.5987, dec: 16.5092, mag: 0.85,
+    spec:true, tier:1, rv:54.3,
+    specNote:'K5III · RV +54 km/s · weak Hα (TiO bands) — use Hβ/Hγ' },
+  { name:'Arcturus (α Boo)',     type:'Star', constellation:'Boötes',     sptype:'K1.5III',     ra:14.2611, dec: 19.1824, mag:-0.05,
+    spec:true, tier:1, rv:-5.2,
+    specNote:'K1.5III · RV ~0 km/s · zero-point reference' },
+  { name:'61 Cygni A',           type:'Star', constellation:'Cygnus',     sptype:'K5V',         ra:21.1150, dec: 38.7492, mag: 5.21,
+    spec:true, tier:1, rv:-65.7,
+    specNote:'K5V · RV −66 km/s · weak Balmer — use CC/metal lines' },
+  { name:'μ Cassiopeiae',        type:'Star', constellation:'Cassiopeia', sptype:'G5V (sd)',    ra: 1.1379, dec: 54.9203, mag: 5.17,
+    spec:true, tier:1, rv:-96.8,
+    specNote:'G5V subdwarf · RV −97 km/s · circumpolar from mid-northern latitudes' },
+  { name:'Groombridge 1830',     type:'Star', constellation:'Ursa Major', sptype:'G8Vp (sd)',   ra:11.8830, dec: 37.7186, mag: 6.42,
+    spec:true, tier:1, rv:-98.4,
+    specNote:'G8Vp subdwarf · RV −98 km/s · metal-poor, shallow lines' },
+
+  // Tier 2: SB2 eclipsing binaries — visible double Hα at quadrature
+  { name:'Spica (α Vir)',        type:'Star', constellation:'Virgo',      sptype:'B1III-IV + B2V', ra:13.4197, dec:-11.1613, mag: 1.04,
+    spec:true, tier:2,
+    specNote:'SB2 B1III-IV + B2V · P=4.01d · Hα split ~325 km/s at quadrature' },
+  { name:'Mizar A (ζ UMa A)',    type:'Star', constellation:'Ursa Major', sptype:'A1V + A1V',      ra:13.3987, dec: 54.9253, mag: 2.23,
+    spec:true, tier:2,
+    specNote:'SB2 A1V + A1V · P=20.5d · split ~140 km/s at quadrature' },
+  { name:'Menkalinan (β Aur)',   type:'Star', constellation:'Auriga',     sptype:'A1IV + A1IV',    ra: 5.9921, dec: 44.9475, mag: 1.90,
+    spec:true, tier:2,
+    specNote:'SB2 A1IV + A1IV eclipsing · P=3.96d · split ~220 km/s at quadrature' },
+
+  // Tier 3: high-velocity halo, faint — challenging with SA100
+  { name:'Kapteyn’s Star',  type:'Star', constellation:'Pictor',     sptype:'sdM1 (M1VI)',  ra: 5.1946, dec:-45.0183, mag: 8.85,
+    spec:true, tier:3, rv:245.5,
+    specNote:'sdM1 (M1VI) · RV +246 km/s · halo · Dec −45° → below horizon from mid-northern latitudes' },
+  { name:'HD 140283 (Methuselah)', type:'Star', constellation:'Libra',    sptype:'F3VI',         ra:15.7175, dec:-10.9333, mag: 7.21,
+    spec:true, tier:3, rv:-170.6,
+    specNote:'F3VI ancient subdwarf · RV −171 km/s · strong Balmer' },
+  { name:'Barnard’s Star',  type:'Star', constellation:'Ophiuchus',  sptype:'M4V',          ra:17.9635, dec:  4.6933, mag: 9.54,
+    spec:true, tier:3, rv:-110.5,
+    specNote:'M4V · high PM · RV −111 km/s · mag 9.5 tough for SA100' },
+
+  // ==== Wolf-Rayet stars — broad emission lines, ideal for SA100 ====
+  // Northern WRs (Dec > −10°) with mag workable on AD8 + 174MM.
+  // Lines to hunt: He II 4686 / 5411, C III 5696, C IV 5806, N III 4640, N IV 4057. FWHM ~1000–3000 km/s.
+  { name:'WR 140 (HD 193793)', type:'Star', constellation:'Cygnus', sptype:'WC7 + O5.5',   ra:20.3411, dec: 43.8544, mag: 6.85,
+    spec:true, tier:1,
+    specNote:'WC7+O5.5 colliding-wind binary · P=7.93 yr · strong C III/C IV emission · brightest northern WR' },
+  { name:'WR 133 (HD 190918)', type:'Star', constellation:'Cygnus', sptype:'WN5 + O9I',    ra:20.0992, dec: 35.7883, mag: 6.75,
+    spec:true, tier:1,
+    specNote:'WN5+O9I · bright · strong He II 4686 / N III emission · easy SA100 target' },
+  { name:'WR 136 (HD 192163)', type:'Star', constellation:'Cygnus', sptype:'WN6(h)',       ra:20.2019, dec: 38.3550, mag: 7.65,
+    spec:true, tier:1,
+    specNote:'WN6(h) · central star of NGC 6888 (Crescent) · strong He II 4686 · N III/IV' },
+  { name:'WR 134 (HD 191765)', type:'Star', constellation:'Cygnus', sptype:'WN6',          ra:20.1706, dec: 36.1764, mag: 8.08,
+    spec:true, tier:2,
+    specNote:'WN6 variable · broad He II 4686 · moderate difficulty at mag 8' },
+  { name:'WR 137 (HD 192641)', type:'Star', constellation:'Cygnus', sptype:'WC7 + O9',     ra:20.2422, dec: 36.6614, mag: 7.91,
+    spec:true, tier:2,
+    specNote:'WC7+O9 dust-forming binary · P=13 yr · C III 5696 bump prominent' },
+  { name:'WR 138 (HD 193077)', type:'Star', constellation:'Cygnus', sptype:'WN5 + B?',     ra:20.2833, dec: 41.1469, mag: 8.01,
+    spec:true, tier:2,
+    specNote:'WN5 · He II / N V lines · Cygnus OB association' },
+  { name:'WR 139 (V444 Cyg)',  type:'Star', constellation:'Cygnus', sptype:'WN5 + O6',     ra:20.3256, dec: 38.7317, mag: 8.00,
+    spec:true, tier:2,
+    specNote:'WN5+O6 eclipsing binary · P=4.21 d · line profiles change through orbit' },
+
+  // ==== Other emission-line / spectroscopic showpieces ====
+  { name:'γ Cassiopeiae',      type:'Star', constellation:'Cassiopeia', sptype:'B0.5IVpe',  ra: 0.9453, dec: 60.7167, mag: 2.47,
+    spec:true, tier:1,
+    specNote:'Be shell star · variable Hα emission · circumpolar · bright — trivial on SA100' },
+  { name:'P Cygni (34 Cyg)',   type:'Star', constellation:'Cygnus',     sptype:'B1-2Ia+',   ra:20.2964, dec: 38.0331, mag: 4.82,
+    spec:true, tier:1,
+    specNote:'LBV · textbook P-Cygni profiles (emission + blueshifted absorption) on Hα, Hβ, He I' },
+
+  // ==== Quasar — real cosmological redshift (stretch target) ====
+  { name:'3C 273',             type:'Quasar', constellation:'Virgo',    sptype:'QSO z=0.158', ra:12.4853, dec:  2.0525, mag:12.90,
+    spec:true, tier:3, rv:47400,
+    specNote:'Brightest quasar · z=0.158 → Hβ 4861→5629 Å, Hγ 4340→5025 Å · mag 12.9 needs long stack on AD8' },
+];
+
+/* Approximate ecliptic-band lookup — adequate for planets, which stay
+ * within ~8° of the ecliptic. RA-bin only. */
+function lookupConstellation(raH /* dec unused */) {
+  const r = norm24(raH);
+  if (r >= 23.50 || r <  1.50) return 'Pisces';
+  if (r <  3.10) return 'Aries';
+  if (r <  5.90) return 'Taurus';
+  if (r <  8.00) return 'Gemini';
+  if (r <  9.30) return 'Cancer';
+  if (r < 11.83) return 'Leo';
+  if (r < 14.83) return 'Virgo';
+  if (r < 15.90) return 'Libra';
+  if (r < 16.50) return 'Scorpius';
+  if (r < 18.27) return 'Ophiuchus';
+  if (r < 20.20) return 'Sagittarius';
+  if (r < 21.83) return 'Capricornus';
+  return 'Aquarius';
+}
+
+/* =========================================================
+ *  MATH  — low-precision astronomy
+ *  Targets star/DSO accuracy ~arc-minute, planets ~0.5°.
+ * ========================================================= */
+const DEG = Math.PI / 180, RAD = 180 / Math.PI;
+const norm360 = d => ((d % 360) + 360) % 360;
+const norm24  = h => ((h % 24) + 24) % 24;
+
+function parseNum(s) {
+  if (typeof s !== 'string') return NaN;
+  return parseFloat(s.trim().replace(',', '.'));
+}
+
+// JD from Date (UTC instant)
+function jdFromDate(d) { return d.getTime() / 86400000 + 2440587.5; }
+
+// Greenwich Mean Sidereal Time (degrees), Meeus eq. 12.4
+function gmst(jd) {
+  const T = (jd - 2451545.0) / 36525;
+  const g = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
+          + 0.000387933 * T * T - T * T * T / 38710000;
+  return norm360(g);
+}
+const lstDeg = (jd, lonDeg) => norm360(gmst(jd) + lonDeg);
+
+// Horizontal coords from equatorial (input: RA hours, Dec degrees)
+function altaz(raH, decDeg, lstD, latDeg) {
+  const H = (lstD - raH * 15) * DEG;
+  const dec = decDeg * DEG, lat = latDeg * DEG;
+  const sinAlt = Math.sin(lat)*Math.sin(dec) + Math.cos(lat)*Math.cos(dec)*Math.cos(H);
+  const alt = Math.asin(sinAlt);
+  const az  = Math.atan2(-Math.cos(dec)*Math.sin(H),
+                         Math.sin(dec)*Math.cos(lat) - Math.cos(dec)*Math.sin(lat)*Math.cos(H));
+  return { alt: alt * RAD, az: norm360(az * RAD) };
+}
+
+// Transit altitude (culmination): 90 - |lat - dec|, capped
+function transitAltOf(decDeg, latDeg) {
+  const a = 90 - Math.abs(latDeg - decDeg);
+  return Math.max(-90, Math.min(90, a));
+}
+
+// Local time of upcoming transit (Date)
+function transitTime(raH, jdNow, lonDeg) {
+  const lstNow = lstDeg(jdNow, lonDeg);
+  let dh = (raH * 15 - lstNow) / 15.04106864;
+  dh = norm24(dh);
+  return new Date((jdNow - 2440587.5 + dh/24) * 86400000);
+}
+
+// Rise/set offset from transit (hours); null = circumpolar or never up at h0
+function riseSetHourAngle(decDeg, latDeg, h0Deg = 0) {
+  const dec = decDeg * DEG, lat = latDeg * DEG;
+  const cosH = (Math.sin(h0Deg * DEG) - Math.sin(lat)*Math.sin(dec))
+             / (Math.cos(lat)*Math.cos(dec));
+  if (cosH > 1) return { circumpolar: false, neverRises: true };
+  if (cosH < -1) return { circumpolar: true, neverRises: false };
+  return { H: Math.acos(cosH) * RAD / 15 };  // hours
+}
+
+// Sun equatorial (RA hours, Dec deg, ecliptic longitude deg)
+function sunPos(jd) {
+  const T = (jd - 2451545.0) / 36525;
+  const L = norm360(280.46646 + 36000.76983*T + 0.0003032*T*T);
+  const M = (357.52911 + 35999.05029*T - 0.0001537*T*T) * DEG;
+  const C = (1.914602 - 0.004817*T) * Math.sin(M)
+          + (0.019993 - 0.000101*T) * Math.sin(2*M)
+          + 0.000289 * Math.sin(3*M);
+  const lambda = (L + C) * DEG;
+  const eps = (23.439291 - 0.0130042*T) * DEG;
+  const ra  = norm24(Math.atan2(Math.cos(eps)*Math.sin(lambda), Math.cos(lambda)) * RAD / 15);
+  const dec = Math.asin(Math.sin(eps)*Math.sin(lambda)) * RAD;
+  return { ra, dec, lambdaDeg: L + C };
+}
+
+// Moon: low precision (Meeus ch. 47 truncated) — good to ~0.3°, phase to ~1%
+function moonPos(jd) {
+  const T = (jd - 2451545.0) / 36525;
+  const Lp = (218.3164477 + 481267.88123421*T) % 360;
+  const D  = (297.8501921 + 445267.1114034*T) % 360;
+  const M  = (357.5291092 +  35999.0502909*T) % 360;
+  const Mp = (134.9633964 + 477198.8675055*T) % 360;
+  const F  = ( 93.2720950 + 483202.0175233*T) % 360;
+  const d = D*DEG, m = M*DEG, mp = Mp*DEG, f = F*DEG;
+  // biggest terms only
+  const dLam =  6.289 * Math.sin(mp)
+              - 1.274 * Math.sin(mp - 2*d)
+              + 0.658 * Math.sin(2*d)
+              - 0.186 * Math.sin(m)
+              - 0.059 * Math.sin(2*mp - 2*d)
+              + 0.057 * Math.sin(mp + 2*d);
+  const dBeta = 5.128 * Math.sin(f)
+              + 0.281 * Math.sin(mp + f)
+              + 0.278 * Math.sin(mp - f)
+              - 0.173 * Math.sin(2*d - f);
+  const lambda = (Lp + dLam) * DEG;
+  const beta   = dBeta * DEG;
+  const eps = (23.439291 - 0.0130042*T) * DEG;
+  const ra  = norm24(Math.atan2(Math.sin(lambda)*Math.cos(eps) - Math.tan(beta)*Math.sin(eps),
+                                Math.cos(lambda)) * RAD / 15);
+  const dec = Math.asin(Math.sin(beta)*Math.cos(eps) + Math.cos(beta)*Math.sin(eps)*Math.sin(lambda)) * RAD;
+  const illum = (1 - Math.cos((Lp - (280.46646 + 36000.76983*T)) * DEG)) / 2;
+  return { ra, dec, illum: Math.max(0, Math.min(1, illum)) };
+}
+
+/* ---- Planet ephemerides (NASA JPL mean elements, J2000) ----
+ * Good to ~arc-minutes over 1800-2050. Adequate for planning.
+ */
+const PLANETS = [
+  // a(AU), e, i(°), L(°), lp(°=ϖ long. of perihelion), O(°=Ω); then rates per century
+  { name:'Mercury', a:[0.38709927, 0.00000037], e:[0.20563593, 0.00001906], i:[7.00497902,-0.00594749], L:[252.25032350,149472.67411175], lp:[77.45779628, 0.16047689], O:[48.33076593,-0.12534081] },
+  { name:'Venus',   a:[0.72333566, 0.00000390], e:[0.00677672,-0.00004107], i:[3.39467605,-0.00078890], L:[181.97909950, 58517.81538729], lp:[131.60246718,0.00268329], O:[76.67984255,-0.27769418] },
+  { name:'Earth',   a:[1.00000261, 0.00000562], e:[0.01671123,-0.00004392], i:[-0.00001531,-0.01294668], L:[100.46457166, 35999.37244981], lp:[102.93768193,0.32327364], O:[0.0, 0.0] },
+  { name:'Mars',    a:[1.52371034, 0.00001847], e:[0.09339410, 0.00007882], i:[1.84969142,-0.00813131], L:[-4.55343205,  19140.30268499], lp:[-23.94362959,0.44441088], O:[49.55953891,-0.29257343] },
+  { name:'Jupiter', a:[5.20288700,-0.00011607], e:[0.04838624,-0.00013253], i:[1.30439695,-0.00183714], L:[34.39644051,  3034.74612775], lp:[14.72847983,0.21252668], O:[100.47390909,0.20469106] },
+  { name:'Saturn',  a:[9.53667594,-0.00125060], e:[0.05386179,-0.00050991], i:[2.48599187, 0.00193609], L:[49.95424423,  1222.49362201], lp:[92.59887831,-0.41897216], O:[113.66242448,-0.28867794] },
+  { name:'Uranus',  a:[19.18916464,-0.00196176], e:[0.04725744,-0.00004397], i:[0.77263783,-0.00242939], L:[313.23810451, 428.48202785], lp:[170.95427630,0.40805281], O:[74.01692503, 0.04240589],
+    mag: 5.7, spec:true, tier:2,
+    specNote:'CH₄ absorption bands 543/619/727/890 nm — broad, resolvable at SA100 R~100 · mag 5.7, near point source' },
+  { name:'Neptune', a:[30.06992276, 0.00026291], e:[0.00859048, 0.00005105], i:[1.77004347, 0.00035372], L:[-55.12002969, 218.45945325], lp:[44.96476227,-0.32241464], O:[131.78422574,-0.00508664],
+    mag: 7.8, spec:true, tier:3,
+    specNote:'Deeper CH₄ bands than Uranus (619/727/890 nm) · mag 7.8 — needs longer exposure, treat as point source' },
+];
+
+function kepler(M, e) {  // M in radians
+  let E = M + e * Math.sin(M);
+  for (let k = 0; k < 10; k++) {
+    const dE = (E - e*Math.sin(E) - M) / (1 - e*Math.cos(E));
+    E -= dE;
+    if (Math.abs(dE) < 1e-9) break;
+  }
+  return E;
+}
+
+function planetHelio(p, T) {
+  const a = p.a[0] + p.a[1]*T;
+  const e = p.e[0] + p.e[1]*T;
+  const i = (p.i[0] + p.i[1]*T) * DEG;
+  const L = (p.L[0] + p.L[1]*T) * DEG;
+  const lp = (p.lp[0] + p.lp[1]*T) * DEG;
+  const O = (p.O[0]  + p.O[1]*T)  * DEG;
+  const w = lp - O;       // argument of perihelion
+  const M = L - lp;
+  // Wrap M into [-π, π): add 3π before the modulus so the result is M itself,
+  // not M shifted by half a turn (the old +2π form displaced every planet ~180°).
+  const E = kepler(((M % (2*Math.PI)) + 3*Math.PI) % (2*Math.PI) - Math.PI, e);
+  const xv = a * (Math.cos(E) - e);
+  const yv = a * Math.sqrt(1 - e*e) * Math.sin(E);
+  // rotate to ecliptic
+  const cw=Math.cos(w), sw=Math.sin(w), cO=Math.cos(O), sO=Math.sin(O), ci=Math.cos(i), si=Math.sin(i);
+  const x = (cw*cO - sw*sO*ci)*xv + (-sw*cO - cw*sO*ci)*yv;
+  const y = (cw*sO + sw*cO*ci)*xv + (-sw*sO + cw*cO*ci)*yv;
+  const z = (sw*si)*xv + (cw*si)*yv;
+  return { x, y, z };
+}
+
+function planetRaDec(p, jd) {
+  const T = (jd - 2451545.0) / 36525;
+  const earth = planetHelio(PLANETS[2], T);
+  const obj = planetHelio(p, T);
+  const x = obj.x - earth.x, y = obj.y - earth.y, z = obj.z - earth.z;
+  const eps = (23.439291 - 0.0130042*T) * DEG;
+  // rotate from ecliptic to equatorial
+  const xe = x;
+  const ye = y * Math.cos(eps) - z * Math.sin(eps);
+  const ze = y * Math.sin(eps) + z * Math.cos(eps);
+  const ra  = norm24(Math.atan2(ye, xe) * RAD / 15);
+  const dec = Math.atan2(ze, Math.sqrt(xe*xe + ye*ye)) * RAD;
+  return { ra, dec };
+}
+
+/* =========================================================
+ *  UI HELPERS
+ * ========================================================= */
+function pad2(n){ return String(n).padStart(2,'0'); }
+function fmtLocal(date, tz){
+  const shifted = new Date(date.getTime() + tz*3600*1000);
+  return `${pad2(shifted.getUTCHours())}:${pad2(shifted.getUTCMinutes())}`;
+}
+function fmtRA(h){
+  const hh = Math.floor(h), mm = Math.floor((h-hh)*60), ss = Math.round(((h-hh)*60-mm)*60);
+  return `${pad2(hh)}h ${pad2(mm)}m ${pad2(ss)}s`;
+}
+function fmtDec(d){
+  const sign = d<0 ? '-' : '+', ad = Math.abs(d);
+  const dd = Math.floor(ad), mm = Math.floor((ad-dd)*60), ss = Math.round(((ad-dd)*60-mm)*60);
+  return `${sign}${pad2(dd)}° ${pad2(mm)}' ${pad2(ss)}"`;
+}
+function fov(s) {
+  // Small-angle FOV in arcminutes; pixel scale arcsec/px
+  const wArcmin = 3438 * s.sensorW / s.focalLength;
+  const hArcmin = 3438 * s.sensorH / s.focalLength;
+  const pxScale = 206.265 * s.pixelSize / s.focalLength;
+  return { wArcmin, hArcmin, pxScale };
+}
+
+/* =========================================================
+ *  RENDERING
+ * ========================================================= */
+let sortKey = 'score', sortDir = -1;
+let lastRows = [];
+
+function localToUTC(inputValue, tzHours) {
+  // datetime-local has no TZ; interpret as the user's location tz.
+  const [d, t] = inputValue.split('T');
+  const [yy, mo, dd] = d.split('-').map(Number);
+  const [hh, mm] = t.split(':').map(Number);
+  return new Date(Date.UTC(yy, mo-1, dd, hh, mm, 0) - tzHours*3600*1000);
+}
+function nowLocalToInput(tzHours) {
+  const now = new Date();
+  const shifted = new Date(now.getTime() + tzHours*3600*1000);
+  return shifted.toISOString().slice(0,16);
+}
+function setNow() {
+  const tz = parseNum(document.getElementById('tz').value);
+  document.getElementById('when').value = nowLocalToInput(tz);
+  refresh();
+}
+
+/* ---------- Day picker panel ---------- */
+const DAY_PANEL_COUNT = 14;  // Open-Meteo forecast reaches ~16 days
+const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function renderDayPanel() {
+  const panel = document.getElementById('dayPanel');
+  const tz = parseNum(document.getElementById('tz').value);
+  const whenStr = document.getElementById('when').value;
+  if (!Number.isFinite(tz) || !whenStr) { panel.innerHTML = ''; return; }
+  const selected = whenStr.slice(0, 10);
+  const todayLocal = new Date(Date.now() + tz*3600*1000);
+  const y = todayLocal.getUTCFullYear(), m = todayLocal.getUTCMonth(), d = todayLocal.getUTCDate();
+  let html = '';
+  for (let i = 0; i < DAY_PANEL_COUNT; i++) {
+    const day = new Date(Date.UTC(y, m, d + i));
+    const iso = day.toISOString().slice(0, 10);
+    const dow = i === 0 ? 'Today' : DOW[day.getUTCDay()];
+    html += `<div class="day-chip${iso === selected ? ' selected' : ''}" data-date="${iso}">
+      <span class="dow">${dow}</span><span class="dom">${MON[day.getUTCMonth()]} ${day.getUTCDate()}</span>
+    </div>`;
+  }
+  panel.innerHTML = html;
+}
+
+document.getElementById('dayPanel').addEventListener('click', e => {
+  const chip = e.target.closest('.day-chip');
+  if (!chip || !chip.dataset.date) return;
+  const whenEl = document.getElementById('when');
+  const time = whenEl.value ? whenEl.value.slice(11) : '22:00';
+  whenEl.value = `${chip.dataset.date}T${time}`;
+  refresh();
+});
+
+function initSetupSelect() {
+  const sel = document.getElementById('setup');
+  sel.innerHTML = SETUPS.map((s,i) => `<option value="${i}">${s.name}</option>`).join('');
+}
+
+function renderSetup() {
+  const idx = +document.getElementById('setup').value;
+  const s = SETUPS[idx];
+  const f = fov(s);
+  document.getElementById('fovInfo').innerHTML = `
+    <b>${s.name}</b> · ${s.camera}<br>
+    Aperture ${s.aperture} mm · Focal ${s.focalLength} mm · f/${(s.focalLength/s.aperture).toFixed(2)}<br>
+    Sensor ${s.sensorW}×${s.sensorH} mm (${s.pxW}×${s.pxH}, ${s.pixelSize} µm) <br>
+    <b>FOV</b> ${f.wArcmin.toFixed(1)}' × ${f.hArcmin.toFixed(1)}' &nbsp;·&nbsp; <b>Pixel scale</b> ${f.pxScale.toFixed(2)}" / px
+  `;
+}
+
+function classifyTarget(alt, maxAlt, minAlt) {
+  if (alt >= minAlt) return 'up-now';
+  if (maxAlt >= minAlt) return 'observable';
+  return 'below';
+}
+function statusText(alt, maxAlt, minAlt) {
+  if (alt >= minAlt) return `Up now (${alt.toFixed(0)}°)`;
+  if (maxAlt >= minAlt) return `Reaches ${maxAlt.toFixed(0)}° tonight`;
+  return `Max ${maxAlt.toFixed(0)}° (below ${minAlt}°)`;
+}
+function scoreOf(alt, maxAlt, minAlt) {
+  // higher = better observability right now
+  if (alt >= minAlt) return 1000 + alt;
+  if (maxAlt >= minAlt) return 500 + maxAlt;
+  return maxAlt;
+}
+
+function buildRow(t, jd, lat, lon, tz, minAlt) {
+  const lst = lstDeg(jd, lon);
+  const aa = altaz(t.ra, t.dec, lst, lat);
+  const maxAlt = transitAltOf(t.dec, lat);
+  const trDate = transitTime(t.ra, jd, lon);
+  const rs = riseSetHourAngle(t.dec, lat, 0);
+  let rise = '—', set = '—';
+  if (rs.circumpolar) { rise = 'circumpolar'; set = 'circumpolar'; }
+  else if (rs.neverRises) { rise = 'never rises'; set = 'never rises'; }
+  else {
+    rise = fmtLocal(new Date(trDate.getTime() - rs.H*3600*1000), tz);
+    set  = fmtLocal(new Date(trDate.getTime() + rs.H*3600*1000), tz);
+  }
+  return {
+    name: t.name, type: t.sptype || t.type,
+    constellation: t.constellation || lookupConstellation(t.ra),
+    mag: t.mag,
+    alt: aa.alt, az: aa.az, maxAlt,
+    transit: fmtLocal(trDate, tz),
+    rise, set,
+    score: scoreOf(aa.alt, maxAlt, minAlt),
+    cls: classifyTarget(aa.alt, maxAlt, minAlt),
+    status: statusText(aa.alt, maxAlt, minAlt),
+    spec: !!t.spec, tier: t.tier || 0, specNote: t.specNote || '',
+  };
+}
+
+function renderTable(rows) {
+  const specOnly = document.getElementById('specOnly').checked;
+  const shown = specOnly ? rows.filter(r => r.spec) : rows;
+  shown.sort((a,b) => (a[sortKey] < b[sortKey] ? -sortDir : a[sortKey] > b[sortKey] ? sortDir : 0));
+  const tbody = document.getElementById('targetBody');
+  tbody.innerHTML = shown.map(r => {
+    const classes = [r.cls, r.spec ? 'spec' : ''].filter(Boolean).join(' ');
+    const tierClass = r.tier ? `tier${r.tier}` : '';
+    return `
+    <tr class="${classes}">
+      <td>${r.name}</td>
+      <td>${r.type}</td>
+      <td>${r.constellation || ''}</td>
+      <td class="${r.mag != null && r.mag <= 8 ? 'good-mag' : ''}">${r.mag != null ? r.mag.toFixed(1) : ''}</td>
+      <td class="${r.alt >= 45 ? 'hi-alt' : ''}">${r.alt.toFixed(1)}</td>
+      <td>${r.az.toFixed(0)}</td>
+      <td>${r.maxAlt.toFixed(0)}</td>
+      <td>${r.transit}</td>
+      <td>${r.rise}</td>
+      <td>${r.set}</td>
+      <td>${r.status}</td>
+      <td class="${tierClass}" style="text-align:left;white-space:normal;max-width:320px">${r.specNote || ''}</td>
+    </tr>`;
+  }).join('');
+  const upNow = shown.filter(r=>r.cls==='up-now').length;
+  const obs   = shown.filter(r=>r.cls!=='below').length;
+  const specCount = rows.filter(r=>r.spec).length;
+  document.getElementById('targetCount').textContent =
+    `(${upNow} up now · ${obs} observable · ${specCount} SA100 targets${specOnly?' · filtered':''})`;
+}
+
+/* =========================================================
+ *  VISIBILITY CHART — cloud cover × astronomical darkness
+ * ========================================================= */
+function darknessFactor(sunAltDeg) {
+  // 0 at sun horizon, 1 at sun ≤ -18° (astronomical night)
+  if (sunAltDeg >= 0) return 0;
+  return Math.min(1, -sunAltDeg / 18);
+}
+
+function moonClarity(moonAltDeg, illum) {
+  // Moon below horizon: no penalty. Above: scale by sin(alt) × illumination.
+  if (moonAltDeg <= 0) return 1;
+  const penalty = Math.sin(moonAltDeg * DEG) * illum * 0.6;
+  return Math.max(0, 1 - penalty);
+}
+
+function visibilityAt(jd, lat, lon, cloudCoverPct) {
+  const lst = lstDeg(jd, lon);
+  const s = sunPos(jd);
+  const sAA = altaz(s.ra, s.dec, lst, lat);
+  const m = moonPos(jd);
+  const mAA = altaz(m.ra, m.dec, lst, lat);
+  const dark = darknessFactor(sAA.alt);
+  const moonF = moonClarity(mAA.alt, m.illum);
+  const cloudF = Math.max(0, (100 - cloudCoverPct) / 100);
+  return Math.round(dark * moonF * cloudF * 100);
+}
+
+function colorForVis(pct) {
+  if (pct >= 70) return '#5cd882';
+  if (pct >= 40) return '#ffcf52';
+  return '#ff6464';
+}
+
+function tonightHourSeries(dateUTC, lat, lon, tz) {
+  // Anchor on local noon of the selected date so we always get TONIGHT'S sunset,
+  // not next-day's, even if the user picked a time after sunset.
+  const local = new Date(dateUTC.getTime() + tz*3600*1000);
+  const y = local.getUTCFullYear(), m = local.getUTCMonth(), d = local.getUTCDate();
+  const noonUTC = new Date(Date.UTC(y, m, d, 12, 0, 0) - tz*3600*1000);
+  const noonJD = jdFromDate(noonUTC);
+  const sun = sunPos(noonJD);
+  const rs = riseSetHourAngle(sun.dec, lat, -0.833);
+  if (rs.circumpolar || rs.neverRises) return null;
+  const transit = transitTime(sun.ra, noonJD, lon);
+  const sunsetUTC = new Date(transit.getTime() + rs.H * 3600 * 1000);
+
+  // Sunrise = next morning's transit minus its H. Use day d+1 local noon as anchor.
+  const tomorrowNoonUTC = new Date(noonUTC.getTime() + 24*3600*1000);
+  const tomorrowJD = jdFromDate(tomorrowNoonUTC);
+  const sunTomorrow = sunPos(tomorrowJD);
+  const rsTomorrow = riseSetHourAngle(sunTomorrow.dec, lat, -0.833);
+  if (rsTomorrow.circumpolar || rsTomorrow.neverRises) return null;
+  const transitTomorrow = transitTime(sunTomorrow.ra, tomorrowJD, lon);
+  const sunriseUTC = new Date(transitTomorrow.getTime() - rsTomorrow.H * 3600 * 1000);
+
+  // Snap each end to the closest hour (round to nearest), expressed as
+  // hours-since-local-midnight-of-day-d so we can iterate continuously.
+  const sunsetLocal  = new Date(sunsetUTC.getTime()  + tz*3600*1000);
+  const sunriseLocal = new Date(sunriseUTC.getTime() + tz*3600*1000);
+  const localMidnightDayD = Date.UTC(y, m, d, 0, 0, 0);
+  const startHour = Math.round((sunsetLocal.getTime()  - localMidnightDayD) / 3600000);
+  const endHour   = Math.round((sunriseLocal.getTime() - localMidnightDayD) / 3600000);
+
+  const hours = [];
+  for (let h = startHour; h <= endHour; h++) {
+    hours.push(new Date(Date.UTC(y, m, d, h, 0, 0) - tz*3600*1000));
+  }
+  return { sunsetUTC, sunriseUTC, hours };
+}
+
+function utcToLocalInput(date, tzHours) {
+  const shifted = new Date(date.getTime() + tzHours*3600*1000);
+  return shifted.toISOString().slice(0,16);
+}
+
+let visibilityFetchSeq = 0;
+async function renderVisibility(lat, lon, tz, dateUTC) {
+  const seq = ++visibilityFetchSeq;
+  const strip = document.getElementById('visStrip');
+  const meta  = document.getElementById('visMeta');
+
+  const series = tonightHourSeries(dateUTC, lat, lon, tz);
+  if (!series) {
+    strip.className = 'vis-strip vis-loading';
+    strip.textContent = 'Polar conditions — no standard sunset.';
+    meta.textContent = '';
+    return;
+  }
+
+  strip.className = 'vis-strip vis-loading';
+  strip.textContent = 'Loading cloud cover…';
+  meta.textContent = '';
+
+  const startDateStr = series.hours[0].toISOString().slice(0, 10);
+  const endDateStr   = series.hours[series.hours.length - 1].toISOString().slice(0, 10);
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+              `&hourly=cloud_cover&start_date=${startDateStr}&end_date=${endDateStr}&timezone=UTC`;
+
+  let cloudByTs = null;
+  let metaText;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    if (seq !== visibilityFetchSeq) return;  // a newer refresh superseded this one
+    cloudByTs = {};
+    for (let i = 0; i < data.hourly.time.length; i++) {
+      const ts = new Date(data.hourly.time[i] + 'Z').getTime();
+      cloudByTs[ts] = data.hourly.cloud_cover[i];
+    }
+    metaText = 'Visibility = sky darkness × moon factor × (100 − cloud cover %). Cloud data: Open-Meteo.';
+  } catch (e) {
+    if (seq !== visibilityFetchSeq) return;
+    metaText = `Cloud cover unavailable (${e.message}) — showing astronomical-only visibility.`;
+  }
+
+  const selectedTs = dateUTC.getTime();
+  // Find the cell whose hour is closest to the selected time, to highlight it.
+  let bestIdx = -1, bestDiff = Infinity;
+  series.hours.forEach((h, i) => {
+    const d = Math.abs(h.getTime() - selectedTs);
+    if (d < bestDiff) { bestDiff = d; bestIdx = i; }
+  });
+
+  strip.className = 'vis-strip';
+  strip.innerHTML = series.hours.map((h, i) => {
+    const cloud = (cloudByTs && cloudByTs[h.getTime()] != null) ? cloudByTs[h.getTime()] : 0;
+    const jd  = jdFromDate(h);
+    const vis = visibilityAt(jd, lat, lon, cloud);
+    const color = colorForVis(vis);
+    const label = fmtLocal(h, tz);
+    const tip = cloudByTs ? `Click to set time · ${vis}% visibility · ${cloud}% cloud` : `Click to set time · ${vis}% (no cloud data)`;
+    const sel = (i === bestIdx) ? ' selected' : '';
+    return `<div class="vis-cell${sel}" data-ts="${h.getTime()}" title="${tip}">
+      <div class="hour">${label}</div>
+      <div class="circle" style="background:${color}"></div>
+      <div class="pct">${vis}%</div>
+    </div>`;
+  }).join('');
+  meta.textContent = metaText;
+}
+
+document.getElementById('visStrip').addEventListener('click', e => {
+  const cell = e.target.closest('.vis-cell');
+  if (!cell || !cell.dataset.ts) return;
+  const tz = parseNum(document.getElementById('tz').value);
+  if (!Number.isFinite(tz)) return;
+  const target = new Date(+cell.dataset.ts);
+  document.getElementById('when').value = utcToLocalInput(target, tz);
+  refresh();
+});
+
+/* =========================================================
+ *  MAIN
+ * ========================================================= */
+function refresh(interactive = false) {
+  const lat = parseNum(document.getElementById('lat').value);
+  const lon = parseNum(document.getElementById('lon').value);
+  const tz  = parseNum(document.getElementById('tz').value);
+  const minAlt = parseNum(document.getElementById('minAlt').value);
+  const whenStr = document.getElementById('when').value;
+  renderSetup();
+  renderDayPanel();
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(tz) || !whenStr) {
+    if (interactive) alert('Please enter location, UTC offset and date/time.');
+    else document.getElementById('subtitle').textContent =
+      'Enter your latitude/longitude (or tap "Use my location") to compute targets.';
+    return;
+  }
+  savePrefs();
+
+  const dateUTC = localToUTC(whenStr, tz);
+  const jd = jdFromDate(dateUTC);
+  const lst = lstDeg(jd, lon);
+
+  document.getElementById('subtitle').textContent =
+    `${lat.toFixed(3)}°N, ${lon.toFixed(3)}°E · UTC${tz>=0?'+':''}${tz} · Local ${new Date(dateUTC.getTime()+tz*3600*1000).toISOString().slice(0,16).replace('T',' ')} · LST ${(lst/15).toFixed(2)}h`;
+
+  // Sun & twilight
+  const sun = sunPos(jd);
+  const sunAA = altaz(sun.ra, sun.dec, lst, lat);
+  const riseSun = riseSetHourAngle(sun.dec, lat,  -0.833);
+  const civil   = riseSetHourAngle(sun.dec, lat,  -6);
+  const naut    = riseSetHourAngle(sun.dec, lat, -12);
+  const astro   = riseSetHourAngle(sun.dec, lat, -18);
+  const sunTransit = transitTime(sun.ra, jd, lon);
+  function sunPair(h) {
+    if (!h) return '—';
+    if (h.circumpolar) return 'never sets';
+    if (h.neverRises)  return 'never rises';
+    return `${fmtLocal(new Date(sunTransit.getTime() - h.H*3600*1000), tz)} / ${fmtLocal(new Date(sunTransit.getTime() + h.H*3600*1000), tz)}`;
+  }
+  document.getElementById('sunInfo').innerHTML = `
+    <b>Sun</b> alt ${sunAA.alt.toFixed(1)}° · az ${sunAA.az.toFixed(0)}°<br>
+    RA ${fmtRA(sun.ra)} · Dec ${fmtDec(sun.dec)}<br>
+    Rise/Set: ${sunPair(riseSun)}`;
+  document.getElementById('twiInfo').innerHTML = `
+    <b>Twilight</b> (rise / set)<br>
+    Civil: ${sunPair(civil)}<br>
+    Nautical: ${sunPair(naut)}<br>
+    Astronomical: ${sunPair(astro)}`;
+
+  // Moon
+  const moon = moonPos(jd);
+  const moonAA = altaz(moon.ra, moon.dec, lst, lat);
+  const phasePct = (moon.illum * 100).toFixed(0);
+  document.getElementById('moonInfo').innerHTML = `
+    <b>Moon</b> alt ${moonAA.alt.toFixed(1)}° · az ${moonAA.az.toFixed(0)}°<br>
+    RA ${fmtRA(moon.ra)} · Dec ${fmtDec(moon.dec)}<br>
+    Illumination: ${phasePct}% ${moon.illum<0.05?'(new)':moon.illum>0.95?'(full)':''}`;
+
+  // Build target rows: DSO + planets (Sun/Moon shown above, skip)
+  const rows = [];
+  for (const t of DSO) rows.push(buildRow(t, jd, lat, lon, tz, minAlt));
+  for (const p of PLANETS) {
+    if (p.name === 'Earth') continue;
+    const pd = planetRaDec(p, jd);
+    rows.push(buildRow({ name: p.name, type: 'Planet', ra: pd.ra, dec: pd.dec,
+                         mag: p.mag ?? null, spec: p.spec, tier: p.tier, specNote: p.specNote },
+                       jd, lat, lon, tz, minAlt));
+  }
+  lastRows = rows;
+  renderTable(rows);
+
+  renderVisibility(lat, lon, tz, dateUTC);
+}
+
+/* ---------- Sorting ---------- */
+document.addEventListener('click', e => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th) return;
+  const key = th.dataset.sort;
+  if (sortKey === key) sortDir = -sortDir;
+  else { sortKey = key; sortDir = (key === 'name' || key === 'type') ? 1 : -1; }
+  renderTable(lastRows);
+});
+
+document.getElementById('specOnly').addEventListener('change', () => renderTable(lastRows));
+
+/* ---------- Live updates on input changes ---------- */
+for (const id of ['when', 'lat', 'lon', 'tz', 'minAlt', 'setup']) {
+  const el = document.getElementById(id);
+  el.addEventListener('change', () => refresh(false));
+  if (el.tagName === 'INPUT' && el.type !== 'datetime-local') {
+    el.addEventListener('input', () => refresh(false));
+  }
+}
+
+/* ---------- Preferences — this device only (localStorage) ---------- */
+const PREFS_KEY = 'atlas-prefs';
+function savePrefs() {
+  try {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
+      lat: document.getElementById('lat').value,
+      lon: document.getElementById('lon').value,
+      tz: document.getElementById('tz').value,
+      minAlt: document.getElementById('minAlt').value,
+      setup: document.getElementById('setup').value,
+    }));
+  } catch (e) { /* private browsing — persistence just doesn't stick */ }
+}
+function loadPrefs() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}');
+    for (const k of ['lat', 'lon', 'tz', 'minAlt']) {
+      if (s[k]) document.getElementById(k).value = s[k];
+    }
+    if (s.setup) document.getElementById('setup').value = s.setup;
+  } catch (e) { /* corrupt prefs — ignore, user re-enters */ }
+}
+
+function useMyLocation() {
+  if (!navigator.geolocation) {
+    alert('Geolocation is not available in this browser.');
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    document.getElementById('lat').value = pos.coords.latitude.toFixed(2);
+    document.getElementById('lon').value = pos.coords.longitude.toFixed(2);
+    document.getElementById('tz').value = String(-new Date().getTimezoneOffset() / 60);
+    refresh();
+  }, err => alert('Could not get location: ' + err.message));
+}
+
+/* ---------- Boot ---------- */
+initSetupSelect();
+loadPrefs();
+if (!Number.isFinite(parseNum(document.getElementById('tz').value))) {
+  document.getElementById('tz').value = String(-new Date().getTimezoneOffset() / 60);
+}
+setNow();    // sets the datetime-local input to "now" in the configured tz and calls refresh()
+</script>
+</body>
+</html>
