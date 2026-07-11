@@ -82,6 +82,9 @@
 
 <section>
   <h2>Location &amp; time</h2>
+  <label>City:
+    <select id="cityPreset"></select>
+  </label>
   <label>Lat (°): <input type="text" id="lat" value=""></label>
   <label>Lon (°): <input type="text" id="lon" value=""></label>
   <label>UTC offset (h): <input type="text" id="tz" value=""></label>
@@ -94,7 +97,7 @@
   <button onclick="refresh(true)">Refresh</button>
   <button onclick="setNow()">Now</button>
   <button onclick="useMyLocation()">Use my location</button>
-  <div class="sub" style="margin-top:8px">Decimal separators: both <code>.</code> and <code>,</code> are accepted. UTC offset auto-fills from this device's clock — adjust it when planning for another time zone or across a DST change. Location and settings are remembered on this device only.</div>
+  <div class="sub" style="margin-top:8px">Pick a city to auto-fill coordinates and UTC offset (DST-aware), or enter them by hand. Decimal separators: both <code>.</code> and <code>,</code> are accepted. UTC offset auto-fills from this device's clock — adjust it when planning for another time zone or across a DST change. Location and settings are remembered on this device only.</div>
   <div id="dayPanel" class="day-strip"></div>
 </section>
 
@@ -930,6 +933,11 @@ for (const id of ['when', 'lat', 'lon', 'tz', 'minAlt', 'setup']) {
     el.addEventListener('input', () => refresh(false));
   }
 }
+// Hand-edited coordinates no longer match the chosen preset
+for (const id of ['lat', 'lon']) {
+  document.getElementById(id).addEventListener('input',
+    () => { document.getElementById('cityPreset').value = ''; });
+}
 
 /* ---------- Preferences — this device only (localStorage) ---------- */
 const PREFS_KEY = 'atlas-prefs';
@@ -955,21 +963,203 @@ function loadPrefs() {
 }
 
 function useMyLocation() {
+  if (!window.isSecureContext) {
+    alert('Geolocation only works on HTTPS (or localhost). Open this page from its ' +
+          'https:// address, or pick your city from the dropdown instead.');
+    return;
+  }
   if (!navigator.geolocation) {
-    alert('Geolocation is not available in this browser.');
+    alert('Geolocation is not available in this browser — pick your city from the dropdown instead.');
     return;
   }
   navigator.geolocation.getCurrentPosition(pos => {
     document.getElementById('lat').value = pos.coords.latitude.toFixed(2);
     document.getElementById('lon').value = pos.coords.longitude.toFixed(2);
     document.getElementById('tz').value = String(-new Date().getTimezoneOffset() / 60);
+    document.getElementById('cityPreset').value = '';
     refresh();
-  }, err => alert('Could not get location: ' + err.message));
+  }, err => {
+    const why = err.code === 1
+      ? 'permission denied — check the browser\'s location setting for this site'
+      : err.message;
+    alert('Could not get location (' + why + '). You can pick your city from the dropdown instead.');
+  }, { timeout: 10000, maximumAge: 600000 });
+}
+
+/* ---------- City presets ----------
+ * [name, lat°, lon°(E+), IANA timezone] — the timezone is resolved to the
+ * correct UTC offset (incl. DST) at pick time via Intl, so no offsets are
+ * hard-coded here.
+ */
+const CITIES = {
+  'Canada': [
+    ['Burnaby', 49.25, -122.98, 'America/Vancouver'],
+    ['Calgary', 51.05, -114.07, 'America/Edmonton'],
+    ['Edmonton', 53.55, -113.49, 'America/Edmonton'],
+    ['Halifax', 44.65, -63.58, 'America/Halifax'],
+    ['Montreal', 45.50, -73.57, 'America/Toronto'],
+    ['Ottawa', 45.42, -75.70, 'America/Toronto'],
+    ['Quebec City', 46.81, -71.21, 'America/Toronto'],
+    ['Saskatoon', 52.13, -106.67, 'America/Regina'],
+    ['St. John’s', 47.56, -52.71, 'America/St_Johns'],
+    ['Toronto', 43.65, -79.38, 'America/Toronto'],
+    ['Vancouver', 49.28, -123.12, 'America/Vancouver'],
+    ['Victoria', 48.43, -123.37, 'America/Vancouver'],
+    ['Winnipeg', 49.90, -97.14, 'America/Winnipeg'],
+  ],
+  'United States': [
+    ['Anchorage', 61.22, -149.90, 'America/Anchorage'],
+    ['Atlanta', 33.75, -84.39, 'America/New_York'],
+    ['Austin', 30.27, -97.74, 'America/Chicago'],
+    ['Boston', 42.36, -71.06, 'America/New_York'],
+    ['Chicago', 41.88, -87.63, 'America/Chicago'],
+    ['Dallas', 32.78, -96.80, 'America/Chicago'],
+    ['Denver', 39.74, -104.99, 'America/Denver'],
+    ['Detroit', 42.33, -83.05, 'America/Detroit'],
+    ['Honolulu', 21.31, -157.86, 'Pacific/Honolulu'],
+    ['Houston', 29.76, -95.37, 'America/Chicago'],
+    ['Kansas City', 39.10, -94.58, 'America/Chicago'],
+    ['Las Vegas', 36.17, -115.14, 'America/Los_Angeles'],
+    ['Los Angeles', 34.05, -118.24, 'America/Los_Angeles'],
+    ['Miami', 25.76, -80.19, 'America/New_York'],
+    ['Minneapolis', 44.98, -93.27, 'America/Chicago'],
+    ['New Orleans', 29.95, -90.07, 'America/Chicago'],
+    ['New York', 40.71, -74.01, 'America/New_York'],
+    ['Orlando', 28.54, -81.38, 'America/New_York'],
+    ['Philadelphia', 39.95, -75.17, 'America/New_York'],
+    ['Phoenix', 33.45, -112.07, 'America/Phoenix'],
+    ['Portland', 45.52, -122.68, 'America/Los_Angeles'],
+    ['Salt Lake City', 40.76, -111.89, 'America/Denver'],
+    ['San Diego', 32.72, -117.16, 'America/Los_Angeles'],
+    ['San Francisco', 37.77, -122.42, 'America/Los_Angeles'],
+    ['Seattle', 47.61, -122.33, 'America/Los_Angeles'],
+    ['Washington DC', 38.90, -77.04, 'America/New_York'],
+  ],
+  'Latin America': [
+    ['Bogotá', 4.71, -74.07, 'America/Bogota'],
+    ['Buenos Aires', -34.60, -58.38, 'America/Argentina/Buenos_Aires'],
+    ['Guadalajara', 20.66, -103.35, 'America/Mexico_City'],
+    ['Lima', -12.05, -77.04, 'America/Lima'],
+    ['Mexico City', 19.43, -99.13, 'America/Mexico_City'],
+    ['Quito', -0.18, -78.47, 'America/Guayaquil'],
+    ['Rio de Janeiro', -22.91, -43.17, 'America/Sao_Paulo'],
+    ['Santiago', -33.45, -70.67, 'America/Santiago'],
+    ['São Paulo', -23.55, -46.63, 'America/Sao_Paulo'],
+  ],
+  'Europe': [
+    ['Amsterdam', 52.37, 4.90, 'Europe/Amsterdam'],
+    ['Athens', 37.98, 23.73, 'Europe/Athens'],
+    ['Barcelona', 41.39, 2.17, 'Europe/Madrid'],
+    ['Berlin', 52.52, 13.40, 'Europe/Berlin'],
+    ['Brussels', 50.85, 4.35, 'Europe/Brussels'],
+    ['Budapest', 47.50, 19.04, 'Europe/Budapest'],
+    ['Copenhagen', 55.68, 12.57, 'Europe/Copenhagen'],
+    ['Dublin', 53.35, -6.26, 'Europe/Dublin'],
+    ['Edinburgh', 55.95, -3.19, 'Europe/London'],
+    ['Helsinki', 60.17, 24.94, 'Europe/Helsinki'],
+    ['Istanbul', 41.01, 28.98, 'Europe/Istanbul'],
+    ['Kyiv', 50.45, 30.52, 'Europe/Kiev'],
+    ['Lisbon', 38.72, -9.14, 'Europe/Lisbon'],
+    ['London', 51.51, -0.13, 'Europe/London'],
+    ['Madrid', 40.42, -3.70, 'Europe/Madrid'],
+    ['Milan', 45.46, 9.19, 'Europe/Rome'],
+    ['Moscow', 55.76, 37.62, 'Europe/Moscow'],
+    ['Munich', 48.14, 11.58, 'Europe/Berlin'],
+    ['Oslo', 59.91, 10.75, 'Europe/Oslo'],
+    ['Paris', 48.86, 2.35, 'Europe/Paris'],
+    ['Prague', 50.09, 14.42, 'Europe/Prague'],
+    ['Reykjavik', 64.15, -21.94, 'Atlantic/Reykjavik'],
+    ['Rome', 41.90, 12.50, 'Europe/Rome'],
+    ['Stockholm', 59.33, 18.07, 'Europe/Stockholm'],
+    ['Vienna', 48.21, 16.37, 'Europe/Vienna'],
+    ['Warsaw', 52.23, 21.01, 'Europe/Warsaw'],
+    ['Zurich', 47.37, 8.54, 'Europe/Zurich'],
+  ],
+  'Africa & Middle East': [
+    ['Cairo', 30.04, 31.24, 'Africa/Cairo'],
+    ['Cape Town', -33.92, 18.42, 'Africa/Johannesburg'],
+    ['Casablanca', 33.57, -7.59, 'Africa/Casablanca'],
+    ['Dubai', 25.20, 55.27, 'Asia/Dubai'],
+    ['Johannesburg', -26.20, 28.05, 'Africa/Johannesburg'],
+    ['Lagos', 6.52, 3.38, 'Africa/Lagos'],
+    ['Nairobi', -1.29, 36.82, 'Africa/Nairobi'],
+    ['Riyadh', 24.71, 46.68, 'Asia/Riyadh'],
+    ['Tel Aviv', 32.09, 34.78, 'Asia/Jerusalem'],
+  ],
+  'Asia': [
+    ['Bangalore', 12.97, 77.59, 'Asia/Kolkata'],
+    ['Bangkok', 13.76, 100.50, 'Asia/Bangkok'],
+    ['Beijing', 39.90, 116.41, 'Asia/Shanghai'],
+    ['Delhi', 28.61, 77.21, 'Asia/Kolkata'],
+    ['Dhaka', 23.81, 90.41, 'Asia/Dhaka'],
+    ['Hanoi', 21.03, 105.85, 'Asia/Ho_Chi_Minh'],
+    ['Hong Kong', 22.32, 114.17, 'Asia/Hong_Kong'],
+    ['Jakarta', -6.21, 106.85, 'Asia/Jakarta'],
+    ['Karachi', 24.86, 67.01, 'Asia/Karachi'],
+    ['Kuala Lumpur', 3.14, 101.69, 'Asia/Kuala_Lumpur'],
+    ['Manila', 14.60, 120.98, 'Asia/Manila'],
+    ['Mumbai', 19.08, 72.88, 'Asia/Kolkata'],
+    ['Osaka', 34.69, 135.50, 'Asia/Tokyo'],
+    ['Seoul', 37.57, 126.98, 'Asia/Seoul'],
+    ['Shanghai', 31.23, 121.47, 'Asia/Shanghai'],
+    ['Singapore', 1.35, 103.82, 'Asia/Singapore'],
+    ['Taipei', 25.03, 121.57, 'Asia/Taipei'],
+    ['Tokyo', 35.68, 139.69, 'Asia/Tokyo'],
+  ],
+  'Oceania': [
+    ['Adelaide', -34.93, 138.60, 'Australia/Adelaide'],
+    ['Auckland', -36.85, 174.76, 'Pacific/Auckland'],
+    ['Brisbane', -27.47, 153.03, 'Australia/Brisbane'],
+    ['Melbourne', -37.81, 144.96, 'Australia/Melbourne'],
+    ['Perth', -31.95, 115.86, 'Australia/Perth'],
+    ['Sydney', -33.87, 151.21, 'Australia/Sydney'],
+    ['Wellington', -41.29, 174.78, 'Pacific/Auckland'],
+  ],
+};
+
+// Current UTC offset (hours) of an IANA zone, DST included. null if the
+// browser can't resolve the zone (old ICU) — caller leaves the field alone.
+function tzOffsetHours(zone, date) {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone: zone, timeZoneName: 'longOffset' })
+      .formatToParts(date).find(p => p.type === 'timeZoneName').value;
+    if (name === 'GMT') return 0;
+    const m = name.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+    if (!m) return null;
+    return (m[1] === '-' ? -1 : 1) * (+m[2] + (+(m[3] || 0)) / 60);
+  } catch (e) { return null; }
+}
+
+function initCitySelect() {
+  const sel = document.getElementById('cityPreset');
+  let html = '<option value="">— choose —</option>';
+  for (const [region, list] of Object.entries(CITIES)) {
+    html += `<optgroup label="${region}">` +
+      list.map(c => `<option value="${c[1]}|${c[2]}|${c[3]}">${c[0]}</option>`).join('') +
+      '</optgroup>';
+  }
+  sel.innerHTML = html;
+  sel.addEventListener('change', () => {
+    if (!sel.value) return;
+    const [lat, lon, zone] = sel.value.split('|');
+    document.getElementById('lat').value = lat;
+    document.getElementById('lon').value = lon;
+    const off = tzOffsetHours(zone, new Date());
+    if (off != null) document.getElementById('tz').value = String(off);
+    refresh();
+  });
 }
 
 /* ---------- Boot ---------- */
 initSetupSelect();
+initCitySelect();
 loadPrefs();
+// URL overrides, e.g. index.html?lat=49.25&lon=-122.98&tz=-7 — lets you
+// bookmark a private home location without it living in the repo.
+const bootParams = new URLSearchParams(location.search);
+for (const k of ['lat', 'lon', 'tz', 'minAlt']) {
+  if (bootParams.has(k)) document.getElementById(k).value = bootParams.get(k);
+}
 if (!Number.isFinite(parseNum(document.getElementById('tz').value))) {
   document.getElementById('tz').value = String(-new Date().getTimezoneOffset() / 60);
 }
