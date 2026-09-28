@@ -31,6 +31,12 @@
   .tier1 { color: #ffd166; }
   .tier2 { color: #9be0ff; }
   .tier3 { color: #b0a0ff; }
+  /* the filter row sticks just under the sortable headers -- 25px is one
+     header row at this font size and padding */
+  .filter-row th { top: 25px; z-index: 1; background: #0c1220; cursor: default;
+                   font-weight: 400; padding: 3px 6px; }
+  .filter-row select { width: 100%; font-size: 11px; padding: 2px 4px; }
+  .filter-row button { padding: 2px 10px; font-size: 11px; }
   .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
   .stat { font-size: 13px; line-height: 1.5; }
   .stat b { color: #fff; }
@@ -39,15 +45,21 @@
   .good { color: #7ee6a3; }
   .bad  { color: #ff8080; }
   td.hi-alt, td.good-mag { color: #ff5e5e; font-weight: 600; }
-  .vis-strip { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; }
-  .vis-cell { display: flex; flex-direction: column; align-items: center; min-width: 52px; cursor: pointer; padding: 4px 2px; border-radius: 6px; transition: background 0.12s; }
+  .vis-strip { display: flex; gap: 10px; align-items: flex-start; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+  .vis-labels { position: sticky; left: 0; z-index: 1; background: #141a2c; display: flex; flex-direction: column; padding: 4px 8px 4px 0; }
+  .vis-labels .metric { justify-content: flex-start; align-items: flex-end; font-size: 12px; color: #9bb4ea; font-weight: 600; padding-top: 6px; }
+  .vis-labels .metric.vis-row { padding-top: 13px; }
+  .vis-cell .metric, .vis-labels .metric { height: 50px; display: flex; flex-direction: column; box-sizing: border-box; }
+  .vis-cell .metric { align-items: center; }
+  .metric.vis-row { border-top: 1px solid #24304b; padding-top: 7px; height: 57px; }
+  .vis-cell { display: flex; flex-direction: column; align-items: center; min-width: 48px; flex-shrink: 0; cursor: pointer; padding: 4px 2px; border-radius: 6px; transition: background 0.12s; }
   .vis-cell:hover { background: rgba(155, 180, 234, 0.12); }
   .vis-cell.selected { background: rgba(155, 180, 234, 0.22); }
-  .vis-cell .hour { font-size: 11px; color: #8aa0d0; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .vis-cell .hour, .vis-labels .hour { font-size: 11px; color: #8aa0d0; margin-bottom: 4px; height: 14px; font-variant-numeric: tabular-nums; }
   .vis-cell.selected .hour { color: #dbe4ff; }
-  .vis-cell .circle { width: 34px; height: 34px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
+  .vis-cell .circle { width: 26px; height: 26px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
   .vis-cell.selected .circle { box-shadow: 0 0 0 2px #dbe4ff; }
-  .vis-cell .pct { font-size: 12px; margin-top: 4px; color: #dbe4ff; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .vis-cell .pct { font-size: 12px; margin-top: 3px; color: #dbe4ff; font-weight: 600; font-variant-numeric: tabular-nums; }
   .vis-loading { color: #8aa0d0; font-size: 12px; }
   .day-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .day-chip { display: flex; flex-direction: column; align-items: center; min-width: 52px; padding: 5px 8px; border: 1px solid #2c3a5b; border-radius: 6px; cursor: pointer; background: #0b1224; transition: background 0.12s; }
@@ -138,6 +150,23 @@
         <th data-sort="set">Set</th>
         <th data-sort="score">Status</th>
         <th>SA100/Other notes</th>
+      </tr>
+      <!-- Filter row: the controls live in the columns they filter, so which
+           column a filter acts on needs no explaining. These cells carry no
+           data-sort, which is also what keeps a click on a select from
+           sorting the table underneath it. -->
+      <tr class="filter-row">
+        <th><button type="button" id="fClear" title="show everything again">clear</button></th>
+        <th><select id="fType"><option value="">all</option></select></th>
+        <th><select id="fCon"><option value="">all</option></select></th>
+        <th><select id="fMag">
+          <option value="">any</option>
+          <option value="4">&lt; 4</option>
+          <option value="5">&lt; 5</option>
+          <option value="6">&lt; 6</option>
+          <option value="7">&lt; 7</option>
+        </select></th>
+        <th colspan="8"></th>
       </tr></thead>
       <tbody id="targetBody"></tbody>
     </table>
@@ -199,6 +228,8 @@ const DSO = [
   { name:'M101 Pinwheel',        type:'Galaxy',      constellation:'Ursa Major',      ra:14.0534, dec: 54.35,  mag: 7.9 },
   { name:'M104 Sombrero',        type:'Galaxy',      constellation:'Virgo',           ra:12.6664, dec:-11.62,  mag: 8.0 },
   { name:'M106 Galaxy',          type:'Galaxy',      constellation:'Canes Venatici',  ra:12.3167, dec: 47.30,  mag: 8.4 },
+  {name:'Mu Cephei',type:'Star',constellation:'Cepheus',sptype:'M2Ia',ra:21.72,dec:58.77,mag:3.43,spec:true, tier:1, rv:-20.63,
+    specNote:'M21a · RV 20.63 km/s · weak Balmer — use Sodium/TiO lines' },
   // NGC / IC
   { name:'NGC 253 Sculptor',     type:'Galaxy',      constellation:'Sculptor',        ra: 0.7925, dec:-25.29,  mag: 7.2 },
   { name:'NGC 869 Double Cluster',type:'Cluster',    constellation:'Perseus',         ra: 2.3167, dec: 57.14,  mag: 4.3 },
@@ -313,6 +344,98 @@ const DSO = [
   { name:'P Cygni (34 Cyg)',   type:'Star', constellation:'Cygnus',     sptype:'B1-2Ia+',   ra:20.2964, dec: 38.0331, mag: 4.82,
     spec:true, tier:1,
     specNote:'LBV · textbook P-Cygni profiles (emission + blueshifted absorption) on Hα, Hβ, He I' },
+
+  // ==== Cool/peculiar spectroscopic targets — added 2026-08-20 ====
+  // Non-A/non-B, V < 7, all above 25 deg from Burnaby on the night they were
+  // picked. Chosen for what the SA100 actually resolves: molecular BANDS
+  // (C2 Swan, ZrO, TiO) and emission lines, not line centroids. Magnitudes
+  // are the VSX maximum where the star varies -- the range is in the note,
+  // and a long-period variable near minimum can be 6-8 mag fainter.
+  // Carbon stars — C2 Swan bands (4737 / 5165 / 5636 A) in absorption
+  { name:'Y CVn (La Superba)',     type:'Star', constellation:'Canes Venatici', sptype:'C-N5',            ra:12.7522, dec: 45.4403, mag: 4.87,
+    spec:true, tier:1,
+    specNote:'carbon star · deep C2 Swan bands · one of the reddest naked-eye stars · spring target, low in the NW by late August' },
+  { name:'TX Psc (19 Psc)',        type:'Star', constellation:'Pisces',  sptype:'C-N6',            ra:23.7732, dec:  3.4868, mag: 5.02,
+    spec:true, tier:1,
+    specNote:'carbon star · strong C2 Swan bands · irregular, V 4.8-5.2 · rises through the small hours' },
+  { name:'V460 Cyg',               type:'Star', constellation:'Cygnus',  sptype:'C-N5',            ra:21.7003, dec: 35.5102, mag: 5.57,
+    spec:true, tier:1,
+    specNote:'carbon star (SRb, V 5.6-6.5, P~180 d) · steadiest bright C2 Swan-band target of the summer sky' },
+  { name:'UX Dra',                 type:'Star', constellation:'Draco',   sptype:'C-N5',            ra:19.3599, dec: 76.5596, mag: 5.94,
+    spec:true, tier:1,
+    specNote:'carbon star (SRb, V 5.9-7.1, P~175 d) · Dec +77, effectively circumpolar from Burnaby' },
+  { name:'RY Dra',                 type:'Star', constellation:'Draco',   sptype:'C-N3III:',        ra:12.9405, dec: 65.9944, mag: 5.88,
+    spec:true, tier:2,
+    specNote:'J-type carbon star (13C-rich) · SRb, V 5.9-8.0 · Swan bands plus the 13C isotope bands' },
+  { name:'RS Cyg',                 type:'Star', constellation:'Cygnus',  sptype:'C-N5.5',          ra:20.2232, dec: 38.7290, mag: 6.50,
+    spec:true, tier:2,
+    specNote:'carbon Mira-like (SRa, V 6.5-9.5, P=417 d) · near maximum now · Swan bands + H emission at max' },
+  { name:'U Cyg',                  type:'Star', constellation:'Cygnus',  sptype:'C9,2e',           ra:20.3268, dec: 47.8942, mag: 6.50,
+    spec:true, tier:2,
+    specNote:'carbon Mira (V 6.5-11.7, P=465 d) · near maximum · Swan bands over Balmer emission — check AAVSO for phase' },
+  { name:'HD 178690',              type:'Star', constellation:'Vulpecula', sptype:'C',               ra:19.1438, dec: 24.1793, mag: 6.68,
+    spec:true, tier:2,
+    specNote:'carbon star · steady · Swan bands, fainter but well placed all night' },
+  // S-type stars — ZrO bands instead of TiO (the Tc / s-process boundary)
+  { name:'chi Cygni (chi Cyg)',    type:'Star', constellation:'Cygnus',  sptype:'S6-9/1-2e',       ra:19.8428, dec: 32.9140, mag: 3.30,
+    spec:true, tier:1,
+    specNote:'S-type Mira (V 3.3-14.2, P=408 d) · brightening toward maximum · ZrO bands + strong Balmer EMISSION near max' },
+  { name:'R Cyg',                  type:'Star', constellation:'Cygnus',  sptype:'S4-8/6e',         ra:19.6137, dec: 50.1999, mag: 6.10,
+    spec:true, tier:2,
+    specNote:'S-type Mira with technetium (V 6.1-15.0, P=427 d) · just past maximum · ZrO bands · transits at the zenith' },
+  { name:'OP Her',                 type:'Star', constellation:'Hercules', sptype:'M6S',             ra:17.9468, dec: 45.3509, mag: 5.85,
+    spec:true, tier:1,
+    specNote:'S-type semiregular (V 5.9-6.7, P=120 d) · steady ZrO/TiO mix — the easy S star' },
+  { name:'HR Peg',                 type:'Star', constellation:'Pegasus', sptype:'S4+/1+',          ra:22.9099, dec: 16.9418, mag: 6.12,
+    spec:true, tier:1,
+    specNote:'S-type semiregular (V 6.1-6.5) · nearly constant · clean ZrO comparison against an M giant' },
+  { name:'57 Pegasi',              type:'Star', constellation:'Pegasus', sptype:'M4S',             ra:23.1587, dec:  8.6772, mag: 4.95,
+    spec:true, tier:1,
+    specNote:'S-type semiregular (V 5.0-5.2, P=93 d) · bright · ZrO with a symbiotic-suspect hot companion' },
+  { name:'BD Cam',                 type:'Star', constellation:'Camelopardalis', sptype:'S3.5/2',          ra: 3.7026, dec: 63.2168, mag: 4.99,
+    spec:true, tier:1,
+    specNote:'symbiotic S star (ZAND, V 5.0-5.4) · ZrO bands plus a hot companion · best after ~03:00' },
+  // Mira at maximum — Balmer lines in EMISSION over deep TiO
+  { name:'R Cas',                  type:'Star', constellation:'Cassiopeia', sptype:'M6.5-9e',         ra:23.9736, dec: 51.3888, mag: 4.70,
+    spec:true, tier:1,
+    specNote:'Mira (V 4.7-13.5, P=431 d) · AT MAXIMUM Aug 2026 · H-alpha/H-beta in emission, TiO bands · transits ~03:00' },
+  // Symbiotic
+  { name:'CH Cyg',                 type:'Star', constellation:'Cygnus',  sptype:'M7III+Be',        ra:19.4092, dec: 50.2414, mag: 5.60,
+    spec:true, tier:2,
+    specNote:'symbiotic binary (V 5.6-8.5) · M7 giant + hot subdwarf · H and He II emission on a TiO continuum · check AAVSO, the range straddles mag 7' },
+  // O supergiants — He II 4686 and N III 4640 in EMISSION on the "f" stars
+  { name:'HD 188209',              type:'Star', constellation:'Cygnus',  sptype:'O9.5Iab',         ra:19.8664, dec: 47.0273, mag: 5.63,
+    spec:true, tier:1,
+    specNote:'O9.5Iab runaway supergiant · H-alpha emission core, He II absorption · transits near the zenith' },
+  { name:'lambda Cephei',          type:'Star', constellation:'Cepheus', sptype:'O6.5I(n)fp',      ra:22.1918, dec: 59.4145, mag: 5.05,
+    spec:true, tier:1,
+    specNote:'O6.5I(n)fp runaway · "f" star: N III 4640 and He II 4686 in emission · H-alpha emission' },
+  { name:'HD 206267',              type:'Star', constellation:'Cepheus', sptype:'O6V((f))+O9:V',   ra:21.6493, dec: 57.4890, mag: 5.62,
+    spec:true, tier:1,
+    specNote:'O6V((f)) multiple, ionising star of IC 1396 · N III 4640 emission, He II 4686 filling in' },
+  { name:'HD 199579',              type:'Star', constellation:'Cygnus',  sptype:'O6.5V((f))z',     ra:20.9430, dec: 44.9247, mag: 5.96,
+    spec:true, tier:2,
+    specNote:'O6.5V((f))z · main-sequence O star · He II 4542/4686 absorption, weak N III emission' },
+  { name:'9 Sagittae',             type:'Star', constellation:'Sagitta', sptype:'O7.5Iabf',        ra:19.8727, dec: 18.6719, mag: 6.23,
+    spec:true, tier:2,
+    specNote:'O7.5Iabf supergiant · full "f" emission: N III 4634-41 and He II 4686 · faint but unmistakable' },
+  { name:'alpha Camelopardalis',   type:'Star', constellation:'Camelopardalis', sptype:'O9Ia',            ra: 4.9008, dec: 66.3427, mag: 4.29,
+    spec:true, tier:1,
+    specNote:'O9Ia runaway supergiant · brightest O star reachable here · H-alpha emission · rises through the night' },
+  // Cool supergiants, hypergiants and composites
+  { name:'VV Cephei',              type:'Star', constellation:'Cepheus', sptype:'M2Ibep+B2',       ra:21.9442, dec: 63.6256, mag: 4.73,
+    spec:true, tier:1,
+    specNote:'eclipsing M supergiant + B star (P=20.4 yr) · TiO bands plus B-star Balmer absorption and emission from the accretion region' },
+  { name:'rho Cassiopeiae',        type:'Star', constellation:'Cassiopeia', sptype:'G2_0',            ra:23.9064, dec: 57.4994, mag: 4.10,
+    spec:true, tier:1,
+    specNote:'yellow hypergiant (V 4.1-6.2) · irregular outbursts drop it to a cool TiO-showing state · one of the most luminous stars visible' },
+  { name:'5 Lacertae',             type:'Star', constellation:'Lacerta', sptype:'K9Ia+B2V',        ra:22.4922, dec: 47.7069, mag: 4.37,
+    spec:true, tier:1,
+    specNote:'composite spectrum: K9Ia supergiant + B2V · TiO bands and hot-star Balmer absorption in one capture' },
+  // R Coronae Borealis prototype
+  { name:'R CrB',                  type:'Star', constellation:'Corona Borealis', sptype:'G0Iep',           ra:15.8096, dec: 28.1567, mag: 5.71,
+    spec:true, tier:2,
+    specNote:'hydrogen-deficient carbon supergiant (V 5.7-15.1) · no Balmer lines, strong C2/CN · unpredictable deep fades — check AAVSO first' },
 
   // ==== Quasar — real cosmological redshift (stretch target) ====
   { name:'3C 273',             type:'Quasar', constellation:'Virgo',    sptype:'QSO z=0.158', ra:12.4853, dec:  2.0525, mag:12.90,
@@ -642,6 +765,9 @@ function buildRow(t, jd, lat, lon, tz, minAlt) {
   }
   return {
     name: t.name, type: t.sptype || t.type,
+    // the DISPLAYED type is the spectral one for a star; the category it came
+    // from is kept separately so the Type filter can offer both
+    cat: t.type,
     constellation: t.constellation || lookupConstellation(t.ra),
     mag: t.mag,
     alt: aa.alt, az: aa.az, maxAlt,
@@ -654,9 +780,81 @@ function buildRow(t, jd, lat, lon, tz, minAlt) {
   };
 }
 
+/* ---------- Column filters: constellation / type / magnitude -------------
+ * The Type column carries two different things -- a star's SPECTRAL type and
+ * a deep-sky object's category -- so the filter offers both. Stars are
+ * grouped into spectral families because "every carbon star up tonight" is
+ * the question actually being asked, and picking C-N5, C-N5.5 and C9,2e
+ * separately answers it three times.
+ */
+const SPEC_FAMILY_ORDER = ['WR','O','B','A','F','G','K','M','S','C'];
+const SPEC_FAMILY_LABEL = {
+  'WR':'WR — Wolf-Rayet', 'O':'O', 'B':'B', 'A':'A', 'F':'F', 'G':'G',
+  'K':'K', 'M':'M — TiO bands', 'S':'S — ZrO bands', 'C':'C — carbon, Swan bands',
+};
+
+function specFamily(type) {
+  const s = String(type || '').trim();
+  if (!s) return null;
+  if (/^W[NCRO]/.test(s)) return 'WR';
+  if (/^C($|[-,0-9])/.test(s)) return 'C';
+  // an S star is written S4/2 or M6S -- the M-with-an-S form is still an S star
+  if (/^S[0-9+]/.test(s) || /^M[0-9.+-]*S/.test(s)) return 'S';
+  const m = s.match(/[OBAFGKM]/);   // 'sdM1', 'kA9hF2mF2' -> the class letter
+  return m ? m[0] : null;
+}
+
+function famOf(r) { return r.cat === 'Star' ? specFamily(r.type) : null; }
+
+function syncFilterOptions(rows) {
+  const con = document.getElementById('fCon');
+  const cons = [...new Set(rows.map(r => r.constellation).filter(Boolean))].sort();
+  setSelect(con, '<option value="">all</option>'
+    + cons.map(c => `<option value="${c}">${c}</option>`).join(''));
+  const cats = [...new Set(rows.map(r => r.cat).filter(Boolean))].sort();
+  const fams = [...new Set(rows.map(famOf).filter(Boolean))]
+    .sort((a, b) => SPEC_FAMILY_ORDER.indexOf(a) - SPEC_FAMILY_ORDER.indexOf(b));
+  setSelect(document.getElementById('fType'),
+    '<option value="">all</option>'
+    + `<optgroup label="Object">`
+    + cats.map(c => `<option value="cat:${c}">${c}</option>`).join('')
+    + `</optgroup><optgroup label="Spectral class">`
+    + fams.map(f => `<option value="sp:${f}">${SPEC_FAMILY_LABEL[f] || f}</option>`).join('')
+    + `</optgroup>`);
+}
+
+/* keep what the user had selected; if it is gone from the new list, fall back
+ * to "all" rather than silently filtering on something no longer offered */
+function setSelect(sel, html) {
+  const keep = sel.value;
+  sel.innerHTML = html;
+  sel.value = keep;
+  if (sel.value !== keep) sel.value = '';
+}
+
+function applyFilters(rows) {
+  const con = document.getElementById('fCon').value;
+  const typ = document.getElementById('fType').value;
+  const lim = parseFloat(document.getElementById('fMag').value);
+  return rows.filter(r => {
+    if (con && r.constellation !== con) return false;
+    if (typ.startsWith('cat:') && r.cat !== typ.slice(4)) return false;
+    if (typ.startsWith('sp:') && famOf(r) !== typ.slice(3)) return false;
+    // an object with no published magnitude cannot satisfy a magnitude cut
+    if (!isNaN(lim) && !(r.mag != null && r.mag < lim)) return false;
+    return true;
+  });
+}
+
+function filtersActive() {
+  return ['fCon', 'fType', 'fMag']
+    .some(id => document.getElementById(id).value !== '');
+}
+
 function renderTable(rows) {
   const specOnly = document.getElementById('specOnly').checked;
-  const shown = specOnly ? rows.filter(r => r.spec) : rows;
+  syncFilterOptions(rows);
+  const shown = applyFilters(specOnly ? rows.filter(r => r.spec) : rows);
   shown.sort((a,b) => (a[sortKey] < b[sortKey] ? -sortDir : a[sortKey] > b[sortKey] ? sortDir : 0));
   const tbody = document.getElementById('targetBody');
   tbody.innerHTML = shown.map(r => {
@@ -682,7 +880,9 @@ function renderTable(rows) {
   const obs   = shown.filter(r=>r.cls!=='below').length;
   const specCount = rows.filter(r=>r.spec).length;
   document.getElementById('targetCount').textContent =
-    `(${upNow} up now · ${obs} observable · ${specCount} SA100 targets${specOnly?' · filtered':''})`;
+    `(${upNow} up now · ${obs} observable · ${specCount} SA100 targets`
+    + (specOnly || filtersActive() ? ` · ${shown.length} of ${rows.length} shown` : '')
+    + ')';
 }
 
 /* =========================================================
@@ -701,7 +901,10 @@ function moonClarity(moonAltDeg, illum) {
   return Math.max(0, 1 - penalty);
 }
 
-function visibilityAt(jd, lat, lon, cloudCoverPct) {
+// Returns the three rows shown in the chart:
+//   moon — how bright the moon makes the sky (sin(alt) × illumination), 0 when set
+//   vis  — overall visibility = darkness × moon factor × cloud factor
+function skyConditionsAt(jd, lat, lon, cloudCoverPct) {
   const lst = lstDeg(jd, lon);
   const s = sunPos(jd);
   const sAA = altaz(s.ra, s.dec, lst, lat);
@@ -710,7 +913,8 @@ function visibilityAt(jd, lat, lon, cloudCoverPct) {
   const dark = darknessFactor(sAA.alt);
   const moonF = moonClarity(mAA.alt, m.illum);
   const cloudF = Math.max(0, (100 - cloudCoverPct) / 100);
-  return Math.round(dark * moonF * cloudF * 100);
+  const moon = mAA.alt > 0 ? Math.round(Math.sin(mAA.alt * DEG) * m.illum * 100) : 0;
+  return { vis: Math.round(dark * moonF * cloudF * 100), moon, moonUp: mAA.alt > 0 };
 }
 
 function colorForVis(pct) {
@@ -796,7 +1000,8 @@ async function renderVisibility(lat, lon, tz, dateUTC) {
       const ts = new Date(data.hourly.time[i] + 'Z').getTime();
       cloudByTs[ts] = data.hourly.cloud_cover[i];
     }
-    metaText = 'Visibility = sky darkness × moon factor × (100 − cloud cover %). Cloud data: Open-Meteo.';
+    metaText = 'Clouds = forecast cloud cover (lower is better). Moon = moon brightness in the sky, illumination × height above horizon (lower is better). ' +
+               'Visibility = sky darkness × moon factor × (100 − cloud cover %). Cloud data: Open-Meteo.';
   } catch (e) {
     if (seq !== visibilityFetchSeq) return;
     metaText = `Cloud cover unavailable (${e.message}) — showing astronomical-only visibility.`;
@@ -811,18 +1016,28 @@ async function renderVisibility(lat, lon, tz, dateUTC) {
   });
 
   strip.className = 'vis-strip';
-  strip.innerHTML = series.hours.map((h, i) => {
-    const cloud = (cloudByTs && cloudByTs[h.getTime()] != null) ? cloudByTs[h.getTime()] : 0;
+  const labels = `<div class="vis-labels">
+      <div class="hour"></div>
+      <div class="metric">Clouds</div>
+      <div class="metric">Moon</div>
+      <div class="metric vis-row">Visibility</div>
+    </div>`;
+  strip.innerHTML = labels + series.hours.map((h, i) => {
+    const hasCloud = !!(cloudByTs && cloudByTs[h.getTime()] != null);
+    const cloud = hasCloud ? cloudByTs[h.getTime()] : 0;
     const jd  = jdFromDate(h);
-    const vis = visibilityAt(jd, lat, lon, cloud);
-    const color = colorForVis(vis);
+    const { vis, moon, moonUp } = skyConditionsAt(jd, lat, lon, cloud);
     const label = fmtLocal(h, tz);
-    const tip = cloudByTs ? `Click to set time · ${vis}% visibility · ${cloud}% cloud` : `Click to set time · ${vis}% (no cloud data)`;
+    const tip = `Click to set time · ${vis}% visibility · ` +
+                (hasCloud ? `${cloud}% cloud` : 'no cloud data') + ' · ' +
+                (moonUp ? `moon brightness ${moon}%` : 'moon below horizon');
     const sel = (i === bestIdx) ? ' selected' : '';
+    const cloudColor = hasCloud ? colorForVis(100 - cloud) : '#3a4560';
     return `<div class="vis-cell${sel}" data-ts="${h.getTime()}" title="${tip}">
       <div class="hour">${label}</div>
-      <div class="circle" style="background:${color}"></div>
-      <div class="pct">${vis}%</div>
+      <div class="metric"><div class="circle" style="background:${cloudColor}"></div><div class="pct">${hasCloud ? cloud + '%' : '—'}</div></div>
+      <div class="metric"><div class="circle" style="background:${colorForVis(100 - moon)}"></div><div class="pct">${moon}%</div></div>
+      <div class="metric vis-row"><div class="circle" style="background:${colorForVis(vis)}"></div><div class="pct">${vis}%</div></div>
     </div>`;
   }).join('');
   meta.textContent = metaText;
@@ -924,6 +1139,12 @@ document.addEventListener('click', e => {
 });
 
 document.getElementById('specOnly').addEventListener('change', () => renderTable(lastRows));
+for (const id of ['fCon', 'fType', 'fMag'])
+  document.getElementById(id).addEventListener('change', () => renderTable(lastRows));
+document.getElementById('fClear').addEventListener('click', () => {
+  for (const id of ['fCon', 'fType', 'fMag']) document.getElementById(id).value = '';
+  renderTable(lastRows);
+});
 
 /* ---------- Live updates on input changes ---------- */
 for (const id of ['when', 'lat', 'lon', 'tz', 'minAlt', 'setup']) {
